@@ -46,8 +46,13 @@ public class R8Wrapper {
   }
 
   public static void main(String[] args) throws Throwable {
+    String[] newArgs = new String[args.length + 2];
+    System.arraycopy(args, 0, newArgs, 0, args.length);
+    newArgs[args.length] = "-libraryjars";
+    newArgs[args.length + 1] = "/work/sahil_workspace/master/prebuilts/r8/jazzer_bootstrap.jar";
+
     R8Wrapper.setOptions();
-    List<String> jarfiles = R8Wrapper.parseJarFile(args);
+    List<String> jarfiles = R8Wrapper.parseJarFile(newArgs);
 
     try {
       Class<?> soongR8Wrapper = Class.forName(
@@ -62,7 +67,7 @@ public class R8Wrapper {
         exit(1);
       }
 
-      main.invokeExact(args);
+      main.invokeExact(newArgs);
       return;
     } catch (ClassNotFoundException cnfe) {
       // This is ok, we wouldn't expect this class to be found outside of AOSP
@@ -82,7 +87,7 @@ public class R8Wrapper {
         exit(1);
       }
 
-      main.invokeExact(args);
+      main.invokeExact(newArgs);
     } catch (Exception e) {
       System.out.println(e);
     }

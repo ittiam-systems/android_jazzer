@@ -19,6 +19,7 @@ package com.code_intelligence.jazzer.r8;
 import static java.lang.System.exit;
 
 import com.code_intelligence.jazzer.driver.OfflineInstrumentor;
+import com.code_intelligence.jazzer.utils.ZipUtils;
 import com.code_intelligence.jazzer.driver.Opt;
 import com.code_intelligence.jazzer.utils.Log;
 import java.io.File;
@@ -46,10 +47,18 @@ public class R8Wrapper {
   }
 
   public static void main(String[] args) throws Throwable {
+    // extracting tha jazzer_android.jar and get the jazzer_bootstrap.jar file 
+    File jazzerForAndroid =
+    ZipUtils.extractFileFromJar("/com/code_intelligence/jazzer/android/jazzer_android.jar");
+
+    File bootstrapJar = Files.createTempFile("jazzer_bootstrap", ".jar").toFile();
+    ZipUtils.extractFileFromJar(jazzerForAndroid.getPath(), "com/code_intelligence/jazzer/runtime/jazzer_bootstrap.jar", bootstrapJar.getPath());
+    bootstrapJar.deleteOnExit();
+
     String[] newArgs = new String[args.length + 2];
     System.arraycopy(args, 0, newArgs, 0, args.length);
     newArgs[args.length] = "-libraryjars";
-    newArgs[args.length + 1] = "/work/sahil_workspace/master/prebuilts/r8/jazzer_bootstrap.jar";
+    newArgs[args.length + 1] = bootstrapJar.getAbsolutePath();
 
     R8Wrapper.setOptions();
     List<String> jarfiles = R8Wrapper.parseJarFile(newArgs);

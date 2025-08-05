@@ -23,6 +23,8 @@ import com.code_intelligence.jazzer.utils.ZipUtils;
 import com.code_intelligence.jazzer.driver.Opt;
 import com.code_intelligence.jazzer.utils.Log;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.ClassNotFoundException;
@@ -37,13 +39,65 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class R8Wrapper {
   private static void setOptions() throws IOException {
     Path dumpClassesDir = Files.createTempDirectory("instrumented_classes");
-    List<String> jazzerOpts = Arrays.asList("--dump_classes_dir=" + dumpClassesDir.toString());
+    List<String> jazzerOpts = new ArrayList<>();
+    jazzerOpts.add("--dump_classes_dir=" + dumpClassesDir.toString());
+    applyConfig(jazzerOpts);
 
     Opt.registerAndValidateCommandLineArgs(Opt.parseJazzerArgs(jazzerOpts));
+  }
+
+  private static void applyConfig(List<String> jazzerOpts) {
+    //TODO: Find an alternative for ths hardcoded configuration path
+    File configFile = new File("/work/sahil_workspace/master/prebuilts/jazzer/jazzer_instrumentation_config.json");
+
+    if (!configFile.exists()) {
+      System.out.println("Config file does not exist");
+      return;
+    }
+
+    try {
+      JsonObject jsonObject = JsonParser.parseReader(new FileReader(configFile)).getAsJsonObject();
+
+      for (Map.Entry<String, JsonElement> entry : jsonObject.entrySet()) {
+        String flag = entry.getKey();
+        JsonElement value = entry.getValue();
+
+        if (value.isJsonArray()) {
+          // Handle list of strings
+          List<String> parts = new ArrayList<>();
+          for (JsonElement element : value.getAsJsonArray()) {
+              parts.add(element.getAsString());
+          }
+          // Example: --instrumentation_excludes=foo:bar:baz
+          jazzerOpts.add("--" + flag + "=" + String.join(":", parts));
+
+        } else if (value.isJsonPrimitive()) {
+          JsonPrimitive primitive = value.getAsJsonPrimitive();
+
+          if (primitive.isBoolean()) {
+            // Example: --some_flag=true or false
+            jazzerOpts.add("--" + flag + "=" + primitive.getAsBoolean());
+          } else if (primitive.isString()) {
+            // Example: --target_class=com.example.MyFuzzer
+            jazzerOpts.add("--" + flag + "=" + primitive.getAsString());
+          } else if (primitive.isNumber()) {
+            // Optional: number handling
+            jazzerOpts.add("--" + flag + "=" + primitive.getAsNumber().toString());
+          }
+
+        } else {
+          System.out.println("Unsupported config type for: " + flag);
+        }
+      }
+
+    } catch (FileNotFoundException e) {
+        System.out.println("Config file was expected but not found: " + e.getMessage());
+    }
   }
 
   public static void main(String[] args) throws Throwable {
